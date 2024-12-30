@@ -19,12 +19,12 @@ i_type_opcode_lookup = {
         'beq': 0b110011,
         'bne': 0b110100,
         'addi': 0b110101,
+        'jalfor': 0b111000,
 }
 
 j_type_opcode_lookup = {
         'j': 0b110110,
         'jal': 0b110111,
-        'jalfor': 0b111000,
 }
 
 
