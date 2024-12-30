@@ -15,7 +15,7 @@ module test_bench;
 
   initial begin
     // Initialize clock and reset
-    clk = 0;
+    clk = -1;
     rst = 1;
     file_init = 0;
     #20 rst = 0; // Release reset after 10 time units

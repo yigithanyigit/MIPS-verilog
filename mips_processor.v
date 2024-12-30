@@ -25,9 +25,9 @@ module mips_processor (
     // Control Unit Signals
     wire [5:0] opcode;
     wire [5:0] funct;
-    wire reg_dst, jump, branch, mem_read, mem_to_reg, mem_write, alu_src, reg_write, jalfor;
+    wire jump, branch, mem_read, mem_to_reg, mem_write, alu_src, reg_write, jalfor;
+    wire [1:0] reg_dst;
     wire [2:0] alu_op; // 3-bit wide
-    
     assign opcode = instruction[31:26];
     assign funct = instruction[5:0];
     
@@ -41,6 +41,7 @@ module mips_processor (
         .mem_to_reg(mem_to_reg),
         .alu_op(alu_op),
         .mem_write(mem_write),
+        .jalfor(jalfor),
         .alu_src(alu_src),
         .reg_write(reg_write)
     );
@@ -60,20 +61,62 @@ module mips_processor (
     assign address = instruction[15:0];
     
     wire [31:0] read_data_1, read_data_2;
+
+    wire [4:0] muxed_rd; // Muxed write register
+    wire [4:0] muxed_rs; // Muxed read register
+
+    reg [5:0] loop_counter;
+
+    multiplexer_5bit_4 mux_reg_dst (
+        .data_in_0(rt),
+        .data_in_1(rd),
+        .data_in_2(5'b11111),
+        .data_in_3(5'b11111),
+        .sel(reg_dst),
+        .data_out(muxed_rd)
+    );
+
+    multiplexer_5bit mux_reg_src (
+        .data_in_0(5'b11111),
+        .data_in_1(rs),
+        .sel(~&loop_counter),
+        .data_out(muxed_rs)
+    );
+
+    wire [31:0] jalfor_writeback_original_address;
+
+    multiplexer mux_write_data (
+      .data_in_0(write_back_data),
+      .data_in_1(PC_out + 4),
+      .sel(jalfor),
+      .data_out(jalfor_writeback_original_address)
+    );
     
     // Instantiate Register File
     register_file rf (
         .clk(clk),
         .rst(rst),
-        .rs(rs),
+        .rs(muxed_rs),
         .rt(rt),
-        .rd(rd),
+        .rd(muxed_rd),
         .reg_write(reg_write),
         .reg_dst(reg_dst),
-        .write_data(write_back_data),
+        .write_data(jalfor_writeback_original_address),
         .file_init(file_init),
         .read_data_1(read_data_1),
         .read_data_2(read_data_2)
+    );
+
+    // Loop Counter and Iteration Logic
+    reg [5:0] number_of_iterations;
+    reg [5:0] iteration_const;
+    wire [31:0] PC_address, ALU_in;
+
+    demux_1to2 demux_read_data_1 (
+        .data_in(read_data_1),
+        .sel(~&loop_counter),
+        .data_out_0(PC_address),
+        .data_out_1(ALU_in)
     );
     
     // ALU Control Signals
@@ -127,8 +170,9 @@ module mips_processor (
 
     multiplexer mux_alu_a (
       .data_in_0(alu_a_pc),
-      .data_in_1(read_data_1),
-      .sel(reg_dst),
+      //.data_in_1(read_data_1),
+      .data_in_1(ALU_in),
+      .sel(reg_dst[0]),
       .data_out(alu_a)
     );
 
@@ -172,26 +216,41 @@ module mips_processor (
         .data_out(write_back_data)
     );
 
-    wire [31:0] jump_address;
-    //assign jump_address = {PC_out[31:28], instruction[25:0], 2'b00};
+    reg [31:0] jalfor_jump_address;
 
-   assign jump_address = {PC_out[31:28], 2'b00 ,instruction[25:0]};
-
-   always @(posedge clk or posedge rst) begin
-       if (rst)
-           PC_out <= 32'b0;
-       else if (jump)
-           PC_out <= jump_address;
-       else if (branch_taken)
-           PC_out <= PC_out + branch_offset;
-       else
-           PC_out <= PC_out + 4;
-   end
+    always @(posedge clk or posedge rst) begin
+        if (rst) begin
+            PC_out <= 32'b0;
+            loop_counter <= 4'b1111;
+            number_of_iterations <= 4'b0000;
+        end else if (jump && jalfor) begin
+            jalfor_jump_address <= {PC_out[31:28], 2'b00, address}; // Jump to target address
+            PC_out <= {PC_out[31:28], 2'b00, address};
+            loop_counter <= rt - 1;
+            number_of_iterations <= rs;
+            iteration_const <= rs;
+        end else if (number_of_iterations > 1) begin
+            PC_out <= PC_out + 4;
+            number_of_iterations <= number_of_iterations - 1;
+        end else if (number_of_iterations == 1 && loop_counter != 0 && loop_counter != 4'b1111) begin
+            number_of_iterations <= iteration_const;
+            loop_counter <= loop_counter - 1;
+            PC_out <= jalfor_jump_address;
+        end else if (loop_counter == 0) begin
+            PC_out <= PC_address + 4;
+            loop_counter <= 4'b1111;
+        end else if (jump && ~jalfor) begin
+            PC_out <= {PC_out[31:28], 2'b00, instruction[15:0]}; // Jump for jal instructions
+        end else if (branch_taken) begin
+            PC_out <= PC_out + branch_offset;
+        end else
+            PC_out <= PC_out + 4; // Sequential execution
+    end
 
 
 
   // Monitor PART
-  initial begin
+  always @(PC_out) begin
     $monitor("Time %t: PC = %h, Instruction = %b, rf[0] = %h (%d), rf[1] = %h (%d), rf[2] = %h (%d), rf[3] = %h (%d), rf[4] = %h (%d), mem[0] = %h (%d), mem[1] = %h (%d), mem[2] = %h (%d), mem[3] = %h (%d), mem[4] = %h (%d)",
 
        $time,
@@ -207,7 +266,6 @@ module mips_processor (
        MEM[3], MEM[3],
        MEM[4], MEM[4]
 );
-    
 end
 
 endmodule

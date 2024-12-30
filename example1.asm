@@ -1,6 +1,6 @@
-or $r1, $r0, $r2
+jalfor $2, $2, 0x0008
 j 0x0c
-nor $r0, $r1, $r2
-beq $r0,$r1, 0xfffe
-addi $r1, $r0, 0x24
-bne $r0,$r1, 0xfffe
+add $r0, $r1, $r0
+addi $r0, $r0, 0x05
+addi $r0, $r0, 0x05
+addi $r0, $r0, 0x05

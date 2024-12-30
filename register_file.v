@@ -4,7 +4,7 @@ module register_file (
     input rst,
     input [4:0] rs, rt, rd,
     input reg_write,
-    input reg_dst,
+    input [1:0] reg_dst,
     input [31:0] write_data,
     input file_init,
     output [31:0] read_data_1, read_data_2
@@ -31,15 +31,15 @@ module register_file (
        //     end
 
             
-        //end else if (reg_write && rd != 5'b00000) begin
-        //    rf[rd] <= write_data;
-        //end
         end else if (reg_write) begin
-            if (reg_dst) begin
-                rf[rd] <= write_data;
-            end else begin
-                rf[rt] <= write_data;
-            end
+            rf[rd] <= write_data;
+        //end
+        //end else if (reg_write) begin
+        //    if (reg_dst) begin
+        //        rf[rd] <= write_data;
+        //    end else begin
+        //        rf[rt] <= write_data;
+        //    end
         end
     end
 
