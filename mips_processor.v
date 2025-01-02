@@ -25,7 +25,7 @@ module mips_processor (
     // Control Unit Signals
     wire [5:0] opcode;
     wire [5:0] funct;
-    wire jump, branch, mem_read, mem_to_reg, mem_write, alu_src, reg_write, jalfor;
+    wire jump, branch, mem_read, mem_to_reg, mem_write,reg_write, jalfor, alu_src;
     wire [1:0] reg_dst;
     wire [2:0] alu_op; // 3-bit wide
     assign opcode = instruction[31:26];
@@ -56,6 +56,9 @@ module mips_processor (
     assign rs = instruction[25:21];
     assign rt = instruction[20:16];
     assign rd = instruction[15:11];
+
+    wire [31:0] shamt;
+    assign shamt = {27'b0, instruction[10:6]};
 
     wire [15:0] address;
     assign address = instruction[15:0];
@@ -132,7 +135,7 @@ module mips_processor (
     );
     
     // ALU Signals
-    wire [31:0] alu_a, alu_b;
+    wire [31:0] alu_a, alu_b, alu_a_temp;
     wire [31:0] alu_result;
     wire zero;
     
@@ -148,8 +151,10 @@ module mips_processor (
     always @(posedge clk or posedge rst) begin
         if (rst)
             branch_taken <= 1'b0;
-        else
-            branch_taken <= (branch && zero);
+        else if (opcode[2:0] == 3'b011)
+            branch_taken = (branch && zero);  //bqe
+        else if (opcode[2:0] == 3'b100)
+            branch_taken = (branch && ~zero); //bne
     end
     
     // ALU Input Assignments
@@ -173,7 +178,7 @@ module mips_processor (
       //.data_in_1(read_data_1),
       .data_in_1(ALU_in),
       .sel(reg_dst[0]),
-      .data_out(alu_a)
+      .data_out(alu_a_temp)
     );
 
     //assign alu_b = alu_src ? immediate : read_data_2; //FIXME write as a multiplexer
@@ -182,6 +187,15 @@ module mips_processor (
       .data_in_1(immediate),
       .sel(alu_src),
       .data_out(alu_b)
+    );
+
+    wire shamt_sel = AlUControlOut == 4'b0001 || AlUControlOut == 4'b0010 ? 1'b1 : 1'b0;
+
+    multiplexer mux_alu_c (
+      .data_in_0(alu_a_temp),
+      .data_in_1(shamt),
+      .sel(shamt_sel),
+      .data_out(alu_a)
     );
     
     // Instantiate ALU

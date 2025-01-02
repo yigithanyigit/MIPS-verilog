@@ -29,10 +29,15 @@ j_type_opcode_lookup = {
 
 
 def assemble_r_type(instruction):
+    shamt = None
+    rt = 0
+    rs = 0
+    rd = 0
     opcode = r_type_opcode
     func = r_type_func_lookup[instruction[0]]
     registers = instruction[1].split(',')
     registers = [register.strip() for register in registers]
+
     if len(registers) != 3:
         raise ValueError(f'Invalid number of registers for instruction {instruction[0]}')
 
@@ -47,14 +52,16 @@ def assemble_r_type(instruction):
     rt = int(registers[1][register_pos])
 
     if func in [0b0001, 0b0010]:
-        rs = int(registers[2])
+        shamt = int(registers[2], 16)
     else:
         register_pos = 1
         if registers[2][1] == 'r':
             register_pos = 2
         rs = int(registers[2][register_pos])
 
-    return (opcode << 26) | (rs << 21) | (rt << 16) | (rd << 11) | (func << 0)
+    shamt_func = (shamt << 6) | (func << 0) if shamt != None else (func << 0)
+
+    return (opcode << 26) | (rs << 21) | (rt << 16) | (rd << 11) | (shamt_func)
 
 def assemble_i_type(instruction):
     #FIXME test lw, sw with data for example;
@@ -67,7 +74,7 @@ def assemble_i_type(instruction):
         registers = [registers[0], registers[1].split('(')[1].split(')')[0], registers[1].split('(')[0]]
 
     registers = [register.strip() for register in registers]
-
+    #print(registers, bin(opcode))
 
     register_pos = 1
     if registers[0][1] == 'r':
@@ -107,7 +114,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description='Assembler for the MIPS processor')
     parser.add_argument('input', type=str, help='Input file')
-    #parser.add_argument('output', type=str, help='Output file')
+    parser.add_argument('--output', type=str, help='Output file', default="None")
     args = parser.parse_args()
 
     with open(args.input, 'r') as f:
@@ -117,9 +124,16 @@ if __name__ == "__main__":
         hex_instructions = [hex(int(instruction)) for instruction in instructions_list]
         bianry_instructions = [bin(int(instruction)) for instruction in instructions_list]
 
-    print(instructions)
-    print(instructions_list)
-    print(hex_instructions)
-    print(bianry_instructions)
+    if args.output != "None":
+        with open(args.output, 'w') as f:
+            for ins in hex_instructions:
+                f.write(ins[2::])
+                f.write("\n")
+    else:
+        print(instructions)
+        print(instructions_list)
+        print(hex_instructions)
+        print(bianry_instructions)
+
     
 
