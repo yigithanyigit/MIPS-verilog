@@ -177,7 +177,7 @@ module mips_processor (
       .data_in_0(alu_a_pc),
       //.data_in_1(read_data_1),
       .data_in_1(ALU_in),
-      .sel(reg_dst[0]),
+      .sel(reg_dst[0] || (reg_dst == 2'b00)),
       .data_out(alu_a_temp)
     );
 

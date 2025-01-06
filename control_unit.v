@@ -59,7 +59,7 @@ module control_unit (
                 jalfor      = 1'b0;
             end
             6'b110101: begin // addi
-                reg_dst     = 2'b1;
+                reg_dst     = 2'b00;
                 jump        = 1'b0;
                 branch      = 1'b0;
                 mem_read    = 1'b0;
